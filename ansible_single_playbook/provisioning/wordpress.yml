@@ -1,0 +1,121 @@
+---
+- hosts: wordpress
+  become: yes
+  tasks:
+    
+    #epel repository
+    - name: Add repository
+      yum_repository:
+        name: epel
+        description: EPEL YUM repo
+        baseurl: https://download.fedoraproject.org/pub/epel/$releasever/$basearch/
+
+    #yum update all
+    - name: upgrade all packages
+      yum: name=* state=latest
+
+    #firewalld
+    - name: Add https
+      firewalld:
+        service: https
+        permanent: yes
+        immediate: yes
+        state: enabled
+
+    - name: Add http
+      firewalld:
+        service: http
+        permanent: yes
+        immediate: yes
+        state: enabled
+
+    #nginx
+    - name: install nginx
+      yum:
+        name: nginx
+        state: latest
+        disable_gpg_check: yes
+
+    - name: copy nginx files
+      copy:
+        src: wp_setup_files/nginx.conf
+        dest: /etc/nginx/nginx.conf
+
+    - name: Start nginx and enable
+      service:
+        name: nginx
+        state: started
+        enabled: yes
+
+    #php
+    - name: install php
+      package:
+        name: php
+        state: present
+    
+    #php-fpm
+    - name: install php-fpm
+      package:
+        name: php-fpm
+        state: present
+
+    - name: copy php-fpm files
+      copy:
+        src: wp_setup_files/www.conf
+        dest: /etc/php-fpm.d/www.conf
+
+    - name: Enable php-fpm, dont touch state
+      service:
+        name: php-fpm
+        enabled: yes
+        state: started
+        
+    #mariadb
+    - name: install mariadb-server
+      package:
+        name: mariadb-server
+        state: present
+
+    - name: enable mariadb-server
+      service:
+        name: mariadb
+        enabled: yes
+        state: started
+      
+    - name: run mariadb security config
+      command: mysql -u root -e "UPDATE mysql.user SET Password=PASSWORD('P@ssw0rd') WHERE User='root'; DELETE FROM mysql.user WHERE User=''; DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1'); DROP DATABASE test; DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';"
+      become: yes
+
+    - name: run wp mariadb config
+      command: mysql -u root -e 'CREATE DATABASE wordpress; CREATE USER wordpress_user@localhost IDENTIFIED BY "P@ssw0rd"; GRANT ALL PRIVILEGES ON wordpress.* TO wordpress_user@localhost; FLUSH PRIVILEGES;'
+      become: yes
+  
+    #wordpress
+    - name: get wordpress source
+      unarchive:
+        src: https://wordpress.org/latest.tar.gz
+        dest: /home/admin
+        remote_src: yes
+      
+    - name: install rsync
+      package:
+        name: rsync
+        state: present
+    
+    - name: run rsync command
+      command: rsync -avP /home/admin/wordpress/ /usr/share/nginx/html/
+    
+    - name: wp-config php copy
+      copy:
+        src: wp_setup_files/wp-config.php
+        dest: wordpress/wp-config.php
+      
+    - name: make nginx uploads
+      command: mkdir /usr/share/nginx/html/wp-content/uploads
+
+    - name: set permissions on wp source
+      file:
+        path: /usr/share/nginx/html/
+        owner: admin
+        group: nginx
+        recurse: yes

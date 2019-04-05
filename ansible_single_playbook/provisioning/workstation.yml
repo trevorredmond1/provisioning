@@ -1,0 +1,67 @@
+---
+- hosts: workstations
+  tasks:
+    
+    #ssh Client Configuration
+    - name: Copies ssh data to workstation
+      copy: src=ssh_files/ dest={{ ansible_env.HOME }}/.ssh/ owner={{ ansible_user_id }} group={{ ansible_user_id }} mode=0600
+      
+    #Virtual Box Configuration
+    - name: install binutils
+      yum: state=present name=binutils
+      become: true
+
+    - name: install qt
+      yum: state=present name=qt
+      become: true
+        
+    - name: install gcc
+      yum: state=present name=gcc
+      become: true
+
+    - name: install remaining virtualbox dependencies
+      yum: state=present name={{ item }}
+      with_items:
+      - make
+      - patch
+      - libgomp
+      - glibc-headers
+      - glibc-devel
+      - kernel-headers
+      - kernel-devel
+      - dkms
+      become: true
+      
+    - name: add virtualbox repository
+      get_url: 
+        url: http://download.virtualbox.org/virtualbox/rpm/rhel/virtualbox.repo
+        dest: /etc/yum.repos.d/virtualbox.repo
+      become: true
+
+    - name: install virtualbox
+      yum: name="VirtualBox-5.0" state=present
+      become: true
+      notify: 
+        - add vboxusers group
+        - add wheel users to vboxusers
+        - run vbox install fix
+        - install vbox extension pack
+
+  handlers:
+    - name: add vboxusers group
+      group: name=vboxusers state=present 
+      become: true
+        
+    - name: add wheel users to vboxusers
+      script: virtualbox_files/add_wheel_users_to_vboxusrs.sh
+      become: true    
+
+    - name: run vbox install fix
+      script: virtualbox_files/vbox_install_fix.sh
+      become: true
+
+    - name: install vbox extension pack
+      script: virtualbox_files/install_vbox_extpack.sh
+      become: true
+
+
