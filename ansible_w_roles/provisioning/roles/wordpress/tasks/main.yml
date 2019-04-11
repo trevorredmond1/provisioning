@@ -1,0 +1,50 @@
+---
+
+#wordpress
+- name: get wordpress source
+  unarchive:
+    src: https://wordpress.org/latest.tar.gz
+    dest: /home/admin
+    remote_src: yes
+  
+- name: install rsync
+  package:
+    name: rsync
+    state: present
+
+- name: run rsync command
+  command: rsync -avP /home/admin/wordpress/ /usr/share/nginx/html/
+
+- name: wp-config php copy
+  copy:
+    src: wp-config.php
+    dest: wordpress/wp-config.php
+  
+- name: make nginx uploads
+  command: mkdir /usr/share/nginx/html/wp-content/uploads
+
+- name: set permissions on wp source
+  file:
+    path: /usr/share/nginx/html/
+    owner: admin
+    group: nginx
+    recurse: yes
+
+- name: create wordress db
+  mysql_db:
+    login_user: "{{ mariadb_priv_user }}"
+    login_password: "{{ mariadb_priv_user_passwd }}"
+    name: "{{ wordpress_db }}"
+
+- name: create wordpress db user 
+  mysql_user: 
+    login_user: "{{ mariadb_priv_user }}"
+    login_password: "{{ mariadb_priv_user_passwd }}"
+    name: "{{ wordpress_db_user }}"
+    password: "{{ wordpress_db_user_passwd }}"
+    priv: "{{ wordpress_db }}.*:ALL"
+    state: present
+
+#force all handlers to run - so all db updates will take effect  
+- meta: flush_handlers
+...

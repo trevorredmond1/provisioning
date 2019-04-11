@@ -1,0 +1,33 @@
+---
+#php
+- name: install php
+  package:
+    name: php
+    state: present
+
+#php mysql
+- name: install php-mysql
+  package:
+    name: php-mysql
+    state: present
+
+#php-fpm
+- name: install php-fpm
+  package:
+    name: php-fpm
+    state: present
+
+- name: copy php-fpm files
+  copy:
+    src: www.conf
+    dest: /etc/php-fpm.d/www.conf
+
+- name: Enable php-fpm, dont touch state
+  service:
+    name: php-fpm
+    enabled: yes
+    state: started
+
+#force all handlers to run - so all db updates will take effect  
+- meta: flush_handlers
+...
